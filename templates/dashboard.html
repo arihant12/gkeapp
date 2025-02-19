@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>User Bio Submission</title>
+    <link rel="stylesheet" href="/static/styles.css">
+</head>
+<body>
+    <header>
+        <h2>User Dashboard</h2>
+    </header>
+
+    <!-- Search Section -->
+    <section>
+        <h2>Search for Users</h2>
+        <input type="text" id="searchQuery" placeholder="Search by name, profession, or bio">
+        <button onclick="searchUsers()">Search</button>
+        <ul id="searchResults"></ul>
+    </section>
+
+    <section>
+        <h2>Submit or Update Your Bio</h2>
+        <form id="userForm" onsubmit="submitUser(event)">
+            <label>Name:</label>
+            <input type="text" id="name" name="name" required>
+            <label>Profession:</label>
+            <input type="text" id="profession" name="profession" required>
+            <label>Bio:</label>
+            <textarea id="bio" name="bio" required></textarea>
+            <button type="submit">Save Details</button>
+        </form>
+    </section>
+
+    <section>
+        <h2>Registered Users</h2>
+        <ul id="userList"></ul>
+    </section>
+
+    <footer>
+        <p>&copy; 2025 User Bio System. All rights reserved.</p>
+    </footer>
+
+    <script>
+        document.addEventListener("DOMContentLoaded", function() {
+            const user = JSON.parse(localStorage.getItem("user"));
+
+            if (!user || !user.email) {
+                alert("Please sign in first.");
+                window.location.href = "/";
+                return;
+            }
+
+            // Load the current user's data
+            fetchUserBio(user.email);
+
+            // Load all users from MySQL
+            loadUsers();
+        });
+
+        async function fetchUserBio(email) {
+            try {
+                const response = await fetch("/get_user_bio", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ email: email })
+                });
+
+                const data = await response.json();
+                if (!data.new_user) {
+                    document.getElementById("name").value = data.name;
+                    document.getElementById("profession").value = data.profession;
+                    document.getElementById("bio").value = data.bio;
+                }
+            } catch (error) {
+                console.error("Error fetching user bio:", error);
+            }
+        }
+
+        async function submitUser(event) {
+            event.preventDefault();
+
+            const user = JSON.parse(localStorage.getItem("user"));
+            if (!user || !user.email) {
+                alert("Please sign in first.");
+                return;
+            }
+
+            const formData = {
+                email: user.email,
+                name: document.getElementById("name").value,
+                profession: document.getElementById("profession").value,
+                bio: document.getElementById("bio").value
+            };
+
+            try {
+                const response = await fetch("/submit_bio", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify(formData)
+                });
+
+                const result = await response.json();
+                alert(result.message || result.error);
+
+                // Refresh user list after saving
+                loadUsers();
+            } catch (error) {
+                console.error("Error submitting bio:", error);
+            }
+        }
+
+        async function loadUsers() {
+            // Existing function - gets all users from MySQL
+            try {
+                const response = await fetch("/get_user_bio");
+                const users = await response.json();
+
+                const userList = document.getElementById("userList");
+                userList.innerHTML = "";
+
+                users.forEach(user => {
+                    const li = document.createElement("li");
+                    li.textContent = `${user.name} - ${user.profession}: ${user.bio}`;
+                    userList.appendChild(li);
+                });
+            } catch (error) {
+                console.error("Error loading users:", error);
+            }
+        }
+
+        // New: Search function that calls the /search_users route
+        async function searchUsers() {
+            const query = document.getElementById("searchQuery").value.trim();
+            if (!query) {
+                alert("Please enter a search query.");
+                return;
+            }
+            try {
+                const response = await fetch(`/search_users?q=${encodeURIComponent(query)}`);
+                const results = await response.json();
+
+                const searchResults = document.getElementById("searchResults");
+                searchResults.innerHTML = "";
+
+                if (results.length === 0) {
+                    const li = document.createElement("li");
+                    li.textContent = "No matching users found.";
+                    searchResults.appendChild(li);
+                    return;
+                }
+
+                // Display results
+                results.forEach(user => {
+                    const li = document.createElement("li");
+                    li.textContent = `${user.name} - ${user.profession}: ${user.bio}`;
+                    searchResults.appendChild(li);
+                });
+            } catch (error) {
+                console.error("Error searching users:", error);
+            }
+        }
+    </script>
+</body>
+</html>

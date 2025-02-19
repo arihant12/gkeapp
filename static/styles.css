@@ -1,0 +1,217 @@
+body {
+    font-family: Arial, sans-serif;
+    margin: 0;
+    padding: 0;
+    background: #f4f4f4;
+}
+
+header {
+    background: #1a1a2e;
+    color: white;
+    padding: 20px;
+    text-align: center;
+}
+
+.hero {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    height: 70vh;
+    text-align: center;
+    color: white;
+    padding: 20px;
+    position: relative;
+    overflow: hidden;
+}
+
+/* Add an overlay to make text readable */
+.hero::before {
+    content: "";
+    position: absolute;
+    top: 0;body {
+        font-family: Arial, sans-serif;
+        margin: 0;
+        padding: 0;
+        background: #f4f4f4;
+        color: white;
+    }
+    
+    header {
+        background: #1a1a2e;
+        color: white;
+        padding: 20px;
+        text-align: center;
+    }
+    
+    /* Hero Section */
+    .hero {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        height: 70vh;
+        text-align: center;
+        color: white;
+        padding: 20px;
+        position: relative;
+        overflow: hidden;
+    }
+    
+    /* Background Overlay for Readability */
+    .hero::before {
+        content: "";
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(0, 0, 0, 0.5);
+        z-index: 0;
+    }
+    
+    .hero h1, .hero p, .cta-button {
+        position: relative;
+        z-index: 1;
+    }
+    
+    .carousel {
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        z-index: -1;
+        overflow: hidden;
+    }
+    
+    .carousel img {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+        position: absolute;
+        opacity: 0;
+        transition: opacity 1s ease-in-out;
+    }
+    
+    .carousel img.active {
+        opacity: 1;
+    }
+    
+    /* Globe Animation Section */
+    #globe-section {
+        text-align: center;
+        padding: 50px;
+        background: #0a192f;
+    }
+    
+    #globe-container {
+        width: 100%;
+        height: 500px;
+    }
+    
+    /* Features Section */
+    .features {
+        display: flex;
+        justify-content: space-around;
+        padding: 50px 20px;
+        background: white;
+        color: black;
+    }
+    
+    .feature-box {
+        width: 30%;
+        text-align: center;
+    }
+    
+    footer {
+        text-align: center;
+        padding: 20px;
+        background: #1a1a2e;
+        color: white;
+    }
+    
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.5); /* Adjust transparency as needed */
+    z-index: 0;
+}
+
+/* Ensure text stays above overlay */
+.hero h1, .hero p, .cta-button {
+    position: relative;
+    z-index: 1;
+}
+
+
+.hero h1 {
+    font-size: 3rem;
+}
+
+.hero p {
+    font-size: 1.2rem;
+    margin-top: 10px;
+}
+
+.cta-button {
+    background: #ff4b5c;
+    color: white;
+    padding: 15px 30px;
+    font-size: 1.2rem;
+    border: none;
+    cursor: pointer;
+    margin-top: 20px;
+    border-radius: 5px;
+    position: relative;
+    z-index: 1; /* Ensures button stays on top */
+}
+
+.features {
+    display: flex;
+    justify-content: space-around;
+    padding: 50px 20px;
+    background: white;
+}
+
+.feature-box {
+    width: 30%;
+    text-align: center;
+}
+
+.feature-box h2 {
+    color: #1a1a2e;
+}
+
+/* Carousel Styling */
+.carousel {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    z-index: -1; /* Moves it behind the content */
+    overflow: hidden;
+}
+
+.carousel img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    position: absolute;
+    opacity: 0;
+    transition: opacity 1s ease-in-out;
+    left: 50%;
+    transform: translateX(-50%);
+}
+.carousel img.active {
+    opacity: 1;
+}
+
+footer {
+    text-align: center;
+    padding: 20px;
+    background: #1a1a2e;
+    color: white;
+    position: relative;
+}

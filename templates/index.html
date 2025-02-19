@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Ask-Pro - Find Experts, Get Answers</title>
+    <link rel="stylesheet" href="static/styles.css">
+</head>
+<body>
+    <header>
+        <h2>Ask-Pro</h2>
+    </header>
+
+    <section class="hero">
+        <div class="carousel">
+            <img src="static/image1.jpeg" class="active" alt="Background Image 1">
+            <img src="static/image2.png" alt="Background Image 2">
+            <img src="static/image3.jpeg" alt="Background Image 3">
+        </div>
+        <h1>Find Experts. Get Instant Help.</h1>
+        <p>AI-powered search to connect with professionals for advice, guidance, and insights.</p>
+        <button class="cta-button" id="google-signin-btn">Sign In with Google</button>
+    </section>
+
+    <!-- Globe Animation Section -->
+    <section id="globe-section">
+        <h2>Global Connections</h2>
+        <p>See real-time connections happening worldwide.</p>
+        <div id="globe-container"></div>
+    </section>
+
+    <section class="features">
+        <div class="feature-box">
+            <h2>📌 Add Your Profile</h2>
+            <p>Showcase your expertise by adding your name, bio, and skills.</p>
+        </div>
+        <div class="feature-box">
+            <h2>🔍 AI-Powered Search</h2>
+            <p>Find professionals tailored to your needs with our advanced AI-driven search.</p>
+        </div>
+        <div class="feature-box">
+            <h2>💬 Chat & Connect</h2>
+            <p>Discuss and negotiate before booking a session with an expert.</p>
+        </div>
+    </section>
+
+    <footer>
+        <p>&copy; 2025 Ask-Pro. All rights reserved.</p>
+    </footer>
+
+    <!-- Firebase Authentication Script -->
+    <script type="module">
+        // Import Firebase modules
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/9.10.0/firebase-app.js";
+        import { getAuth, GoogleAuthProvider, signInWithPopup } from "https://www.gstatic.com/firebasejs/9.10.0/firebase-auth.js";
+
+        // Firebase Configuration
+        const firebaseConfig = {
+        apiKey: "AIzaSyDsxErqANu39_AtR3DFypENlfmlx4tK95Y",
+        authDomain: "uni-connect-446707.firebaseapp.com",
+        projectId: "uni-connect-446707",
+        storageBucket: "uni-connect-446707.firebasestorage.app",
+        messagingSenderId: "535506613508",
+        appId: "1:535506613508:web:6749f8a36ed0c9334f4c51",
+        measurementId: "G-H5KQWEGY0Q"
+      };
+
+        // Initialize Firebase
+        const app = initializeApp(firebaseConfig);
+        const auth = getAuth(app);
+
+        // Attach function globally to make it accessible
+        window.signInWithGoogle = function() {
+            console.log("Google Sign-In Clicked"); // Debug log
+            const provider = new GoogleAuthProvider();
+            signInWithPopup(auth, provider)
+                .then((result) => {
+                    console.log("Sign-In Success:", result.user); // Debug log
+                    const user = result.user;
+                    localStorage.setItem('user', JSON.stringify(user));
+                    window.location.href = '/dashboard'; // Redirect to dashboard
+                })
+                .catch((error) => {
+                    console.error("Error signing in:", error);
+                    alert("Authentication failed. Please try again.");
+                });
+        }
+
+        // Ensure button click triggers the function
+        document.getElementById("google-signin-btn").addEventListener("click", window.signInWithGoogle);
+    </script>
+
+    <!-- Carousel & Globe Animation Script -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/gsap.min.js"></script>
+    <script src="/static/script.js"></script>
+</body>
+</html>
