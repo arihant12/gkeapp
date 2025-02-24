@@ -93,9 +93,14 @@ def get_user_bio():
     if request.method == "GET":
         try:
             with engine.connect() as conn:
-                result = conn.execute(text("SELECT name, profession, bio FROM users"))
+                result = conn.execute(text(
+                    "SELECT name, profession, bio, priority_dm_charge, one_on_one_call_charge FROM users"
+                ))
                 rows = result.fetchall()
-            users = [{"name": row[0], "profession": row[1], "bio": row[2]} for row in rows]
+            users = [{
+                "name": row[0], "profession": row[1], "bio": row[2],
+                "priority_dm_charge": row[3], "one_on_one_call_charge": row[4]
+            } for row in rows]
             return jsonify(users)
         except Exception as e:
             return jsonify({"error": str(e)}), 500
@@ -109,18 +114,23 @@ def get_user_bio():
         try:
             with engine.connect() as conn:
                 result = conn.execute(
-                    text("SELECT name, profession, bio FROM users WHERE email = :email"),
+                    text("SELECT name, profession, bio, priority_dm_charge, one_on_one_call_charge FROM users WHERE email = :email"),
                     {"email": email}
                 )
                 user = result.fetchone()
 
             if user:
-                return jsonify({"name": user[0], "profession": user[1], "bio": user[2], "new_user": False})
+                return jsonify({
+                    "name": user[0], "profession": user[1], "bio": user[2],
+                    "priority_dm_charge": user[3], "one_on_one_call_charge": user[4],
+                    "new_user": False
+                })
             else:
                 return jsonify({"message": "No bio found", "new_user": True}), 200
 
         except Exception as e:
             return jsonify({"error": str(e)}), 500
+
 
 
 # ------------------------------------------------
@@ -134,6 +144,8 @@ def submit_bio():
     name = data.get("name")
     profession = data.get("profession")
     bio = data.get("bio")
+    priority_dm_charge = data.get("priority_dm_charge", 0.0)
+    one_on_one_call_charge = data.get("one_on_one_call_charge", 0.0)
 
     if not email or not name or not profession or not bio:
         return jsonify({"error": "All fields are required"}), 400
@@ -145,26 +157,45 @@ def submit_bio():
 
             if existing_user:
                 conn.execute(
-                    text("UPDATE users SET name = :name, profession = :profession, bio = :bio WHERE email = :email"),
-                    {"name": name, "profession": profession, "bio": bio, "email": email}
+                    text("""
+                        UPDATE users 
+                        SET name = :name, profession = :profession, bio = :bio, 
+                            priority_dm_charge = :priority_dm_charge, one_on_one_call_charge = :one_on_one_call_charge 
+                        WHERE email = :email
+                    """),
+                    {
+                        "name": name, "profession": profession, "bio": bio,
+                        "priority_dm_charge": priority_dm_charge, "one_on_one_call_charge": one_on_one_call_charge,
+                        "email": email
+                    }
                 )
             else:
                 conn.execute(
-                    text("INSERT INTO users (email, name, profession, bio) VALUES (:email, :name, :profession, :bio)"),
-                    {"email": email, "name": name, "profession": profession, "bio": bio}
+                    text("""
+                        INSERT INTO users (email, name, profession, bio, priority_dm_charge, one_on_one_call_charge) 
+                        VALUES (:email, :name, :profession, :bio, :priority_dm_charge, :one_on_one_call_charge)
+                    """),
+                    {
+                        "email": email, "name": name, "profession": profession, "bio": bio,
+                        "priority_dm_charge": priority_dm_charge, "one_on_one_call_charge": one_on_one_call_charge
+                    }
                 )
             conn.commit()
 
         es.index(
             index="askpro-users",
             id=email,
-            body={"email": email, "name": name, "profession": profession, "bio": bio}
+            body={
+                "email": email, "name": name, "profession": profession, "bio": bio,
+                "priority_dm_charge": priority_dm_charge, "one_on_one_call_charge": one_on_one_call_charge
+            }
         )
 
         return jsonify({"message": "User data saved successfully!"})
 
     except Exception as e:
         return jsonify({"error": str(e)}), 500
+
 
 
 # -----------------------------
@@ -178,10 +209,22 @@ def search_users():
         return jsonify([])
 
     try:
-        es_query = {"query": {"multi_match": {"query": query, "fields": ["name", "profession", "bio"]}}}
+        es_query = {
+            "query": {
+                "multi_match": {
+                    "query": query,
+                    "fields": ["name", "profession", "bio"]
+                }
+            }
+        }
         response = es.search(index="askpro-users", body=es_query)
         hits = response["hits"]["hits"]
-        results = [{"email": h["_source"]["email"], "name": h["_source"]["name"], "profession": h["_source"]["profession"], "bio": h["_source"]["bio"]} for h in hits]
+        results = [{
+            "email": h["_source"]["email"], "name": h["_source"]["name"],
+            "profession": h["_source"]["profession"], "bio": h["_source"]["bio"],
+            "priority_dm_charge": h["_source"].get("priority_dm_charge", 0.0),
+            "one_on_one_call_charge": h["_source"].get("one_on_one_call_charge", 0.0)
+        } for h in hits]
         return jsonify(results)
 
     except Exception as e:

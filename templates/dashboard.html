@@ -28,6 +28,10 @@
             <input type="text" id="profession" name="profession" required>
             <label>Bio:</label>
             <textarea id="bio" name="bio" required></textarea>
+            <label>Priority DM charge:</label>
+            <input type="number" id="priority_dm_charge" name="priority_dm_charge" required>
+            <label>One-on-One call charge:</label>
+            <input type="number" id="one_on_one_call_charge" name="one_on_one_call_charge" required>
             <button type="submit">Save Details</button>
         </form>
     </section>
@@ -71,6 +75,8 @@
                     document.getElementById("name").value = data.name;
                     document.getElementById("profession").value = data.profession;
                     document.getElementById("bio").value = data.bio;
+                    document.getElementById("priority_dm_charge").value = data.priority_dm_charge || 0.00;
+                    document.getElementById("one_on_one_call_charge").value = data.one_on_one_call_charge || 0.00;
                 }
             } catch (error) {
                 console.error("Error fetching user bio:", error);
@@ -90,8 +96,11 @@
                 email: user.email,
                 name: document.getElementById("name").value,
                 profession: document.getElementById("profession").value,
-                bio: document.getElementById("bio").value
+                bio: document.getElementById("bio").value,
+                priority_dm_charge: parseFloat(document.getElementById("priority_dm_charge").value) || 0.00,
+                one_on_one_call_charge: parseFloat(document.getElementById("one_on_one_call_charge").value) || 0.00
             };
+
 
             try {
                 const response = await fetch("/submit_bio", {
@@ -111,7 +120,6 @@
         }
 
         async function loadUsers() {
-            // Existing function - gets all users from MySQL
             try {
                 const response = await fetch("/get_user_bio");
                 const users = await response.json();
@@ -121,7 +129,12 @@
 
                 users.forEach(user => {
                     const li = document.createElement("li");
-                    li.textContent = `${user.name} - ${user.profession}: ${user.bio}`;
+                    li.innerHTML = `
+                        <strong>${user.name}</strong> - ${user.profession}<br>
+                        <em>${user.bio}</em><br>
+                        💬 <strong>Priority DM Charge:</strong> $${user.priority_dm_charge.toFixed(2)}<br>
+                        📞 <strong>1-on-1 Call Charge:</strong> $${user.one_on_one_call_charge.toFixed(2)}
+                    `;
                     userList.appendChild(li);
                 });
             } catch (error) {
@@ -156,10 +169,15 @@
                     return;
                 }
 
-                // ✅ Display results and make users clickable
+                // ✅ Display results with new fields
                 results.forEach(user => {
                     const li = document.createElement("li");
-                    li.innerHTML = `<strong>${user.name}</strong> - ${user.profession}<br><em>${user.bio}</em>`;
+                    li.innerHTML = `
+                        <strong>${user.name}</strong> - ${user.profession}<br>
+                        <em>${user.bio}</em><br>
+                        💬 <strong>Priority DM Charge:</strong> $${user.priority_dm_charge.toFixed(2)}<br>
+                        📞 <strong>1-on-1 Call Charge:</strong> $${user.one_on_one_call_charge.toFixed(2)}
+                    `;
                     li.style.cursor = "pointer";
                     li.style.padding = "10px";
                     li.style.borderBottom = "1px solid #ccc";
