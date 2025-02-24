@@ -1,28 +1,43 @@
-from flask import Flask, request, jsonify, render_template
+from flask import Flask, request, jsonify, render_template, redirect
 import os
+import requests  # ✅ Used to communicate with chat service
 from sqlalchemy import create_engine, text
 import pymysql
-
-# 1) Import Elasticsearch
-from elasticsearch import Elasticsearch
+from flask_cors import CORS  # ✅ Allow frontend requests from React
+from elasticsearch import Elasticsearch  # ✅ Elasticsearch for search functionality
 
 app = Flask(__name__)
+CORS(app)  # ✅ Enable CORS for all routes
 
-# ✅ Cloud SQL Credentials (Replace with environment variables in production)
+# ✅ Cloud SQL Credentials (Use environment variables in production)
 DB_USER = os.getenv("DB_USER", "root")
 DB_PASSWORD = os.getenv("DB_PASSWORD", "Test%40123")
 DB_HOST = os.getenv("DB_HOST", "127.0.0.1")
 DB_PORT = os.getenv("DB_PORT", "3306")
 DB_NAME = os.getenv("DB_NAME", "userbio_db")
 
-# ✅ SQLAlchemy Database URL
+# ✅ SQLAlchemy Database Connection
 DATABASE_URL = f"mysql+pymysql://{DB_USER}:{DB_PASSWORD}@{DB_HOST}:{DB_PORT}/{DB_NAME}"
 engine = create_engine(DATABASE_URL)
 
 # ✅ Connect to Elasticsearch (assuming it's running on localhost:9200)
-es = Elasticsearch(["http://localhost:9200"])
+es = Elasticsearch(
+    ["https://localhost:9200"],  # Use HTTPS instead of HTTP
+    basic_auth=("elastic", "Test123"),  # Authenticate with username & password
+    verify_certs=False  # Ignore SSL certificate verification (ONLY for local testing)
+)
+try:
+    if es.ping():
+        print("✅ Connected to Elasticsearch successfully!")
+    else:
+        print("❌ Elasticsearch connection failed!")
+except Exception as e:
+    print("❌ Error connecting to Elasticsearch:", str(e))
 
-# ✅ Test DB Connection
+# ✅ Chat Microservice URL (Modify if running in production)
+CHAT_SERVICE_URL = os.getenv("CHAT_SERVICE_URL", "http://localhost:5001")
+
+# ✅ Test Database Connection
 try:
     with engine.connect() as conn:
         result = conn.execute(text("SELECT DATABASE();"))
@@ -36,36 +51,56 @@ def home():
     """Serve the frontend UI."""
     return render_template("index.html")
 
+
 @app.route("/dashboard")
 def dashboard():
     return render_template("dashboard.html")
 
 
-# ---------------------------------------------
-# Existing: Get a user's bio by email (POST)
-#           Or if method=GET, get all user bios
-# ---------------------------------------------
+# -------------------------------
+# ✅ Fetch Chat History from Chat Service
+# -------------------------------
+@app.route("/chat_history/<sender>/<receiver>", methods=["GET"])
+def chat_history(sender, receiver):
+    """Fetch chat history from chat service."""
+    try:
+        response = requests.get(f"{CHAT_SERVICE_URL}/chat_history/{sender}/{receiver}")
+        return jsonify(response.json())
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+# -------------------------------
+# ✅ Serve React Chat Frontend
+# -------------------------------
+@app.route("/chat")
+def chat():
+    """Redirect users to the React-based chat frontend"""
+    receiver_email = request.args.get("receiver", "")
+
+    if not receiver_email:
+        return jsonify({"error": "Receiver email is required"}), 400
+
+    # ✅ Redirect to React frontend running at http://localhost:3000/chat
+    return redirect(f"http://localhost:3000/chat?receiver={receiver_email}")
+
+
+# -----------------------------
+# ✅ Get a User's Bio (MySQL)
+# -----------------------------
 @app.route("/get_user_bio", methods=["GET", "POST"])
 def get_user_bio():
     if request.method == "GET":
-        # Get ALL users from MySQL
         try:
             with engine.connect() as conn:
                 result = conn.execute(text("SELECT name, profession, bio FROM users"))
                 rows = result.fetchall()
-            users = []
-            for row in rows:
-                users.append({
-                    "name": row[0],
-                    "profession": row[1],
-                    "bio": row[2],
-                })
+            users = [{"name": row[0], "profession": row[1], "bio": row[2]} for row in rows]
             return jsonify(users)
         except Exception as e:
             return jsonify({"error": str(e)}), 500
 
     else:
-        # POST - get a single user by email
         data = request.json
         email = data.get("email")
         if not email:
@@ -80,12 +115,7 @@ def get_user_bio():
                 user = result.fetchone()
 
             if user:
-                return jsonify({
-                    "name": user[0],
-                    "profession": user[1],
-                    "bio": user[2],
-                    "new_user": False
-                })
+                return jsonify({"name": user[0], "profession": user[1], "bio": user[2], "new_user": False})
             else:
                 return jsonify({"message": "No bio found", "new_user": True}), 200
 
@@ -94,8 +124,7 @@ def get_user_bio():
 
 
 # ------------------------------------------------
-# Existing: Submit (insert/update) a user's bio
-# Modified to also index user data in Elasticsearch
+# ✅ Insert/Update User Bio (MySQL + Elasticsearch)
 # ------------------------------------------------
 @app.route("/submit_bio", methods=["POST"])
 def submit_bio():
@@ -111,35 +140,25 @@ def submit_bio():
 
     try:
         with engine.connect() as conn:
-            # Check if user exists
             result = conn.execute(text("SELECT 1 FROM users WHERE email = :email"), {"email": email})
             existing_user = result.fetchone()
 
             if existing_user:
-                # Update
                 conn.execute(
                     text("UPDATE users SET name = :name, profession = :profession, bio = :bio WHERE email = :email"),
                     {"name": name, "profession": profession, "bio": bio, "email": email}
                 )
             else:
-                # Insert
                 conn.execute(
                     text("INSERT INTO users (email, name, profession, bio) VALUES (:email, :name, :profession, :bio)"),
                     {"email": email, "name": name, "profession": profession, "bio": bio}
                 )
             conn.commit()
 
-        # ---- Index or Update Elasticsearch ----
-        # Use email as the document ID for easy upserts.
         es.index(
-            index="askpro-users",            # Name of your index
-            id=email,                       # Use the email as the document id
-            body={
-                "email": email,
-                "name": name,
-                "profession": profession,
-                "bio": bio
-            }
+            index="askpro-users",
+            id=email,
+            body={"email": email, "name": name, "profession": profession, "bio": bio}
         )
 
         return jsonify({"message": "User data saved successfully!"})
@@ -149,41 +168,20 @@ def submit_bio():
 
 
 # -----------------------------
-# New: Search route with ES
+# ✅ Search Users (Elasticsearch)
 # -----------------------------
 @app.route("/search_users", methods=["GET"])
 def search_users():
     """Search for users in Elasticsearch by name, profession, or bio."""
     query = request.args.get("q", "")
-
     if not query:
-        return jsonify([])  # Return empty if no query
+        return jsonify([])
 
     try:
-        # Multi-match query on name, profession, and bio
-        es_query = {
-            "query": {
-                "multi_match": {
-                    "query": query,
-                    "fields": ["name", "profession", "bio"]
-                }
-            }
-        }
-
+        es_query = {"query": {"multi_match": {"query": query, "fields": ["name", "profession", "bio"]}}}
         response = es.search(index="askpro-users", body=es_query)
         hits = response["hits"]["hits"]
-
-        # Extract _source from each hit
-        results = []
-        for h in hits:
-            source = h["_source"]
-            results.append({
-                "email": source.get("email"),
-                "name": source.get("name"),
-                "profession": source.get("profession"),
-                "bio": source.get("bio")
-            })
-
+        results = [{"email": h["_source"]["email"], "name": h["_source"]["name"], "profession": h["_source"]["profession"], "bio": h["_source"]["bio"]} for h in hits]
         return jsonify(results)
 
     except Exception as e:
@@ -191,6 +189,4 @@ def search_users():
 
 
 if __name__ == "__main__":
-    # For production, use a production server like Gunicorn.
-    # For local dev, debug=True is fine.
     app.run(host="0.0.0.0", port=8080, debug=True)

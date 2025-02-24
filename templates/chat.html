@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chat</title>
+
+    <!-- ✅ Include Firebase SDK -->
+    <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-auth.js"></script>
+
+    <!-- ✅ Firebase Configuration (Replace with actual credentials) -->
+    <script>
+        // Import Firebase modules
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/9.10.0/firebase-app.js";
+        import { getAuth, GoogleAuthProvider, signInWithPopup } from "https://www.gstatic.com/firebasejs/9.10.0/firebase-auth.js";
+
+        // Firebase Configuration
+        const firebaseConfig = {
+        apiKey: "AIzaSyDsxErqANu39_AtR3DFypENlfmlx4tK95Y",
+        authDomain: "uni-connect-446707.firebaseapp.com",
+        projectId: "uni-connect-446707",
+        storageBucket: "uni-connect-446707.firebasestorage.app",
+        messagingSenderId: "535506613508",
+        appId: "1:535506613508:web:6749f8a36ed0c9334f4c51",
+        measurementId: "G-H5KQWEGY0Q"
+      };
+
+        // Initialize Firebase
+        const app = initializeApp(firebaseConfig);
+        const auth = getAuth(app);
+    </script>
+
+    <!-- ✅ Include WebSocket (Socket.IO) -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.0.1/socket.io.min.js"></script>
+
+    <link rel="stylesheet" href="/static/styles.css">
+</head>
+<body>
+    <h2>Chat with <span id="chat-with"></span></h2>
+
+    <div id="chat-box">
+        <div id="message-container"></div>
+    </div>
+
+    <input id="message-input" type="text" placeholder="Type a message..." />
+    <button id="send-btn">Send</button>
+
+    <!-- ✅ Inline JavaScript for `sendMessage()` -->
+    <script>
+        console.log("✅ chat.js Loaded");
+
+        const socket = io("http://localhost:5001");
+
+        function getQueryParam(param) {
+            const urlParams = new URLSearchParams(window.location.search);
+            return urlParams.get(param);
+        }
+
+        const receiverEmail = getQueryParam("receiver");
+        document.getElementById("chat-with").innerText = receiverEmail || "Unknown User";
+
+        let currentUserEmail = "";
+
+        firebase.auth().onAuthStateChanged(user => {
+            if (user) {
+                currentUserEmail = user.email;
+                console.log("✅ Logged in as:", currentUserEmail);
+
+                socket.emit("join_chat", { sender: currentUserEmail, receiver: receiverEmail });
+
+                loadChatHistory();
+            } else {
+                alert("⚠️ Please log in first!");
+                window.location.href = "/login.html";
+            }
+        });
+
+        function loadChatHistory() {
+            fetch(`/chat_history/${currentUserEmail}/${receiverEmail}`)
+                .then(response => response.json())
+                .then(messages => {
+                    const messageContainer = document.getElementById("message-container");
+                    messageContainer.innerHTML = "";
+
+                    messages.forEach(msg => {
+                        const messageElement = document.createElement("div");
+                        messageElement.classList.add("message");
+                        messageElement.classList.add(msg.sender === currentUserEmail ? "sent" : "received");
+                        messageElement.innerText = `${msg.sender}: ${msg.message}`;
+                        messageContainer.appendChild(messageElement);
+                    });
+                })
+                .catch(error => console.error("❌ Error loading chat history:", error));
+        }
+
+        // ✅ Inline `sendMessage()` to avoid "sendMessage is not defined"
+        document.getElementById("send-btn").onclick = function () {
+            console.log("📤 Sending message...");
+            const messageInput = document.getElementById("message-input");
+            const message = messageInput.value.trim();
+
+            if (!message) return;
+
+            const data = { sender: currentUserEmail, receiver: receiverEmail, message };
+            socket.emit("send_message", data);
+            messageInput.value = "";
+        };
+
+        socket.on("receive_message", data => {
+            console.log("📩 Message received:", data);
+            const messageContainer = document.getElementById("message-container");
+            const messageElement = document.createElement("div");
+
+            messageElement.classList.add("message");
+            messageElement.classList.add(data.sender === currentUserEmail ? "sent" : "received");
+            messageElement.innerText = `${data.sender}: ${data.message}`;
+            messageContainer.appendChild(messageElement);
+        });
+    </script>
+</body>
+</html>
