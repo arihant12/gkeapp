@@ -1,14 +1,15 @@
-from flask import Flask, request, jsonify
+from flask import Flask, request, jsonify, redirect, session
 from flask_socketio import SocketIO, emit, join_room
 from flask_cors import CORS
 from sqlalchemy import create_engine, text
 import os
 import pymysql
+import requests
 
 # ✅ Initialize Flask app
 app = Flask(__name__)
 app.config['SECRET_KEY'] = 'your_secret_key'
-CORS(app)  # ✅ Allow React frontend to access chat service
+CORS(app, resources={r"/*": {"origins": ["http://localhost:3000", "https://localhost:3000"]}}, supports_credentials=True)  # ✅ Allow React frontend to access chat service
 socketio = SocketIO(app, cors_allowed_origins="*")
 
 # ✅ Cloud SQL Connection
@@ -22,6 +23,8 @@ DB_NAME = os.getenv("DB_NAME", "userbio_db")
 DATABASE_URL = f"mysql+pymysql://{DB_USER}:{DB_PASSWORD}@{DB_HOST}:{DB_PORT}/{DB_NAME}"
 engine = create_engine(DATABASE_URL)
 
+MAIN_BACKEND_URL = "http://localhost:8080"  # ✅ Update to main backend running on port 8080
+
 # ✅ Test Cloud SQL Connection
 try:
     with engine.connect() as conn:
@@ -33,13 +36,18 @@ except Exception as e:
 
 # ✅ Store Messages in Cloud SQL
 @socketio.on('send_message')
-def handle_send_message(data):
+@app.route('/send_message', methods=['POST', 'OPTIONS'])  # ✅ Allow OPTIONS for CORS
+def handle_send_message():
+    if request.method == "OPTIONS":
+        return jsonify({"message": "OK"}), 200  # ✅ Respond to preflight requests
+
+    data = request.get_json()
     sender = data.get('sender')
     receiver = data.get('receiver')
     message = data.get('message')
 
     if not sender or not receiver or not message:
-        return
+        return jsonify({"error": "Missing required fields"}), 400
 
     print(f"📩 {sender} → {receiver}: {message}")
 
@@ -50,13 +58,16 @@ def handle_send_message(data):
                 text("INSERT INTO messages (sender, receiver, message) VALUES (:sender, :receiver, :message)"),
                 {"sender": sender, "receiver": receiver, "message": message}
             )
-            conn.commit()
+            conn.commit()  # ✅ Ensure commit is executed
     except Exception as e:
         print("❌ Error saving message:", str(e))
+        return jsonify({"error": "Database error"}), 500
 
-    # Emit message to both sender and receiver rooms
+    # ✅ Emit message to WebSocket channel for real-time updates
     room = f"{sender}-{receiver}" if sender < receiver else f"{receiver}-{sender}"
     emit("receive_message", data, room=room)
+
+    return jsonify({"message": "Message sent successfully"}), 200
 
 
 # ✅ Fetch Chat History
@@ -67,16 +78,50 @@ def get_chat_history(sender, receiver):
         with engine.connect() as conn:
             result = conn.execute(
                 text("""
-                    SELECT sender, message 
+                    SELECT sender, receiver, message, timestamp 
                     FROM messages 
                     WHERE (sender=:sender AND receiver=:receiver) 
                        OR (sender=:receiver AND receiver=:sender) 
-                    ORDER BY id
+                    ORDER BY timestamp ASC
                 """),
                 {"sender": sender, "receiver": receiver}
             )
-            messages = [{"sender": row[0], "message": row[1]} for row in result.fetchall()]
+            messages = [{"sender": row[0], "receiver": row[1], "message": row[2], "timestamp": row[3]} for row in result.fetchall()]
         return jsonify(messages)
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+# ✅ Fetch Relevant Conversations
+@app.route('/get_chats', methods=['GET'])
+def get_chats():
+    user_id = request.args.get("user_id") or session.get("user_id")  # ✅ Ensure user_id is retrieved
+    clicked_user = request.args.get("clicked_user")  # ✅ Get the user that was clicked on
+
+    if not user_id:
+        return jsonify({"error": "User ID is required"}), 400
+
+    try:
+        with engine.connect() as conn:
+            # ✅ Fetch users the current user has chatted with
+            result = conn.execute(
+                text("""
+                    SELECT DISTINCT 
+                        CASE WHEN sender = :user_id THEN receiver ELSE sender END AS chat_partner
+                    FROM messages 
+                    WHERE sender = :user_id OR receiver = :user_id
+                """),
+                {"user_id": user_id}
+            )
+            conversations = {row[0] for row in result.fetchall()}  # Convert to set
+
+            # ✅ If the user has no previous chats, add the clicked user dynamically
+            if not conversations and clicked_user:
+                conversations.add(clicked_user)
+
+            chat_list = [{"chat_partner": user} for user in sorted(conversations)]
+
+        return jsonify({"conversations": chat_list})
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
@@ -90,7 +135,6 @@ def handle_join_chat(data):
     if not sender or not receiver:
         return
 
-    # Ensure unique room for one-on-one chat
     room = f"{sender}-{receiver}" if sender < receiver else f"{receiver}-{sender}"
     join_room(room)
     print(f"👥 {sender} joined room {room}")

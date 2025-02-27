@@ -46,17 +46,18 @@
     </footer>
 
     <script>
+        const loggedInuser = JSON.parse(localStorage.getItem("user"));
         document.addEventListener("DOMContentLoaded", function() {
-            const user = JSON.parse(localStorage.getItem("user"));
+            
 
-            if (!user || !user.email) {
+            if (!loggedInuser || !loggedInuser.email) {
                 alert("Please sign in first.");
                 window.location.href = "/";
                 return;
             }
 
             // Load the current user's data
-            fetchUserBio(user.email);
+            fetchUserBio(loggedInuser.email);
 
             // Load all users from MySQL
             loadUsers();
@@ -86,14 +87,14 @@
         async function submitUser(event) {
             event.preventDefault();
 
-            const user = JSON.parse(localStorage.getItem("user"));
-            if (!user || !user.email) {
+            const loggedInuser = JSON.parse(localStorage.getItem("user"));
+            if (!loggedInuser || !loggedInuser.email) {
                 alert("Please sign in first.");
                 return;
             }
 
             const formData = {
-                email: user.email,
+                email: loggedInuser.email,
                 name: document.getElementById("name").value,
                 profession: document.getElementById("profession").value,
                 bio: document.getElementById("bio").value,
@@ -184,8 +185,9 @@
 
                     // ✅ Clicking a user redirects to chat.html with their email as a query param
                     li.onclick = () => {
-                        window.location.href = `http://localhost:3000/chat?receiver=${user.email}`;
-                    };
+    window.location.href = `http://localhost:3000/chat?receiver=${user.email}&loggedInuser=${loggedInuser.email}`;
+};
+
 
                     searchResults.appendChild(li);
                 });
