@@ -9,7 +9,7 @@ import requests
 # ✅ Initialize Flask app
 app = Flask(__name__)
 app.config['SECRET_KEY'] = 'your_secret_key'
-CORS(app, resources={r"/*": {"origins": ["http://localhost:3000", "https://localhost:3000"]}}, supports_credentials=True)  # ✅ Allow React frontend to access chat service
+CORS(app, resources={r"/*": {"origins": "http://localhost:3000"}}, supports_credentials=True)
 socketio = SocketIO(app, cors_allowed_origins="*")
 
 # ✅ Cloud SQL Connection
@@ -35,39 +35,82 @@ except Exception as e:
 
 
 # ✅ Store Messages in Cloud SQL
-@socketio.on('send_message')
-@app.route('/send_message', methods=['POST', 'OPTIONS'])  # ✅ Allow OPTIONS for CORS
-def handle_send_message():
-    if request.method == "OPTIONS":
-        return jsonify({"message": "OK"}), 200  # ✅ Respond to preflight requests
-
-    data = request.get_json()
+@socketio.on('send_message')  # ✅ WebSocket Handler
+def handle_send_message_socket(data):
+    """Handles message sending via WebSocket"""
     sender = data.get('sender')
     receiver = data.get('receiver')
     message = data.get('message')
 
     if not sender or not receiver or not message:
-        return jsonify({"error": "Missing required fields"}), 400
+        print("❌ Missing required fields:", data)
+        return  # WebSocket cannot send HTTP responses
 
     print(f"📩 {sender} → {receiver}: {message}")
 
-    # Insert message into MySQL
+    # ✅ Insert message into MySQL
     try:
         with engine.connect() as conn:
             conn.execute(
                 text("INSERT INTO messages (sender, receiver, message) VALUES (:sender, :receiver, :message)"),
                 {"sender": sender, "receiver": receiver, "message": message}
             )
-            conn.commit()  # ✅ Ensure commit is executed
+            conn.commit()
+
+        # ✅ Emit the message to both users
+        room = f"{sender}-{receiver}" if sender < receiver else f"{receiver}-{sender}"
+        emit("receive_message", data, room=room)
+
     except Exception as e:
         print("❌ Error saving message:", str(e))
-        return jsonify({"error": "Database error"}), 500
 
-    # ✅ Emit message to WebSocket channel for real-time updates
-    room = f"{sender}-{receiver}" if sender < receiver else f"{receiver}-{sender}"
-    emit("receive_message", data, room=room)
 
-    return jsonify({"message": "Message sent successfully"}), 200
+@app.route('/send_message', methods=['POST', 'OPTIONS'])  # ✅ HTTP Handler
+def handle_send_message_http():
+    """Handles message sending via HTTP API"""
+    if request.method == "OPTIONS":
+        response = jsonify({"message": "CORS Preflight OK"})
+        response.headers.add("Access-Control-Allow-Origin", "http://localhost:3000")
+        response.headers.add("Access-Control-Allow-Methods", "POST, OPTIONS")
+        response.headers.add("Access-Control-Allow-Headers", "Content-Type, Authorization")
+        response.headers.add("Access-Control-Allow-Credentials", "true")
+        return response, 200
+
+    try:
+        data = request.get_json()
+        sender = data.get('sender')
+        receiver = data.get('receiver')
+        message = data.get('message')
+
+        if not sender or not receiver or not message:
+            print("❌ Missing required fields:", data)
+            response = jsonify({"error": "Missing required fields"})
+            response.headers.add("Access-Control-Allow-Origin", "http://localhost:3000")
+            response.headers.add("Access-Control-Allow-Credentials", "true")
+            return response, 400
+
+        print(f"📩 {sender} → {receiver}: {message}")
+
+        # ✅ Insert Message into MySQL
+        with engine.connect() as conn:
+            conn.execute(
+                text("INSERT INTO messages (sender, receiver, message) VALUES (:sender, :receiver, :message)"),
+                {"sender": sender, "receiver": receiver, "message": message}
+            )
+            conn.commit()
+
+        # ✅ Return Success Response
+        response = jsonify({"message": "Message sent successfully"})
+        response.headers.add("Access-Control-Allow-Origin", "http://localhost:3000")
+        response.headers.add("Access-Control-Allow-Credentials", "true")
+        return response, 200
+
+    except Exception as e:
+        print("❌ Error saving message:", str(e))
+        response = jsonify({"error": "Database error", "details": str(e)})
+        response.headers.add("Access-Control-Allow-Origin", "http://localhost:3000")
+        response.headers.add("Access-Control-Allow-Credentials", "true")
+        return response, 500
 
 
 # ✅ Fetch Chat History

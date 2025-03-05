@@ -4,7 +4,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>User Bio Submission</title>
-    <link rel="stylesheet" href="/static/styles.css">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="/static/stylesd.css">
 </head>
 <body>
     <header>
@@ -13,7 +14,7 @@
 
     <!-- Search Section -->
     <section>
-        <h2>Search for Users</h2>
+        <h2>Search for Professionals</h2>
         <input type="text" id="searchQuery" placeholder="Search by name, profession, or bio">
         <button onclick="searchUsers()">Search</button>
         <ul id="searchResults"></ul>
@@ -172,16 +173,18 @@
 
                 // ✅ Display results with new fields
                 results.forEach(user => {
-                    const li = document.createElement("li");
-                    li.innerHTML = `
-                        <strong>${user.name}</strong> - ${user.profession}<br>
-                        <em>${user.bio}</em><br>
-                        💬 <strong>Priority DM Charge:</strong> $${user.priority_dm_charge.toFixed(2)}<br>
-                        📞 <strong>1-on-1 Call Charge:</strong> $${user.one_on_one_call_charge.toFixed(2)}
-                    `;
-                    li.style.cursor = "pointer";
-                    li.style.padding = "10px";
-                    li.style.borderBottom = "1px solid #ccc";
+            const li = document.createElement("div");
+            li.className = "search-result card p-3";
+
+            li.innerHTML = `
+                <img src="${user.profile_image || '/static/default-avatar.png'}" class="profile-img" alt="Profile">
+                <strong>${user.name}</strong> - ${user.profession}
+                <em>${user.bio}</em>
+                <div class="charge-info">
+                    💬 DM Charge: <span class="dm-charge">$${user.priority_dm_charge.toFixed(2)}</span><br>
+                    📞 1-on-1 Call: <span class="call-charge">$${user.one_on_one_call_charge.toFixed(2)}</span>
+                </div>
+            `;
 
                     // ✅ Clicking a user redirects to chat.html with their email as a query param
                     li.onclick = () => {
@@ -196,5 +199,6 @@
             }
         }
     </script>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 </body>
 </html>

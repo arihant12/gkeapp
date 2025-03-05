@@ -9,10 +9,8 @@ function App() {
 
     return (
         <div>
-            <h2>Chat Application</h2>
             {sender ? (
                 <>
-                    <p>Logged in as: {sender}</p>
                     <ChatComponent sender={sender} receiver={receiver} />
                 </>
             ) : (
